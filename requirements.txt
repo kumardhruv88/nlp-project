@@ -1,7 +1,10 @@
-flask
-scikit-learn
-pandas
-nltk
 numpy
-gunicorn
+matplotlib
+seaborn
+scikit-learn
+wordcloud
+nltk
+xgboost
+streamlit
+flask
 matplotlib

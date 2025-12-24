@@ -1,6 +1,18 @@
 from flask import Flask, request, jsonify, send_file, render_template
 import re
 from io import BytesIO
+import os
+import nltk
+
+# Set a writable directory for nltk data (important for Render)
+NLTK_DATA_DIR = os.path.join(os.getcwd(), "nltk_data")
+os.makedirs(NLTK_DATA_DIR, exist_ok=True)
+
+nltk.data.path.append(NLTK_DATA_DIR)
+
+# Download required resources safely
+nltk.download("stopwords", download_dir=NLTK_DATA_DIR, quiet=True)
+
 
 # nltk.download('stopwords')
 from nltk.corpus import stopwords
