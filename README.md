@@ -45,7 +45,7 @@ This project builds a **binary sentiment classification system** to predict whet
 - Python
 
 ### Data Analysis & Visualization
-- NumPy
+- Numpy
 - Pandas
 - Matplotlib
 - Seaborn
