@@ -32,9 +32,9 @@ def test():
     return "Test request received successfully. Service is running."
 
 
-@app.route("/", methods=["GET", "POST"])
+@app.route("/")
 def home():
-    return render_template("landing.html")
+    return render_template("index.html")
 
 
 @app.route("/predict", methods=["POST"])
