@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Text Sentiment Predictor</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <!-- Font Awesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+
+<body>
+    <div class="container">
+        <div class="card">
+            <h1>Sentiment Analysis</h1>
+            <p class="subtitle">Analyze the sentiment of your text or CSV file instantly.</p>
+
+            <form id="predictionForm">
+                <div class="input-group">
+                    <label for="textInput">Enter Text</label>
+                    <textarea id="textInput" placeholder="Type or paste your text here (e.g., 'I love this service!')..."></textarea>
+                </div>
+
+                <div class="input-group">
+                     <label>Or Upload CSV</label>
+                    <div class="file-upload-wrapper">
+                        <input type="file" id="csvFileInput" accept=".csv" onchange="updateFileName(this)">
+                        <div class="file-upload-text" id="fileNameDisplay">
+                            <i class="fas fa-cloud-upload-alt fa-2x"></i><br>
+                            <span>Click or Drag CSV file here</span>
+                        </div>
+                    </div>
+                </div>
+
+                <button type="button" class="btn-primary" onclick="predict()" id="predictBtn">
+                    <span>Analyze Sentiment</span>
+                </button>
+                
+                <button id="downloadBtn" type="button" class="btn-secondary" style="display:none" onclick="downloadPredictions()">
+                    <i class="fas fa-download"></i> Download Predictions
+                </button>
+            </form>
+
+            <div id="predictionResult"></div>
+            <div id="graphContainer"></div>
+        </div>
+    </div>
+
+    <script>
+        function updateFileName(input) {
+            var fileNameDisplay = document.getElementById("fileNameDisplay");
+            if (input.files.length > 0) {
+                fileNameDisplay.innerHTML = '<i class="fas fa-file-csv fa-2x"></i><br>' + input.files[0].name;
+                // Clear text area if file is selected to avoid confusion
+                document.getElementById("textInput").value = ""; 
+            } else {
+                fileNameDisplay.innerHTML = '<i class="fas fa-cloud-upload-alt fa-2x"></i><br><span>Click or Drag CSV file here</span>';
+            }
+        }
+
+        function predict() {
+            var csvFileInput = document.getElementById("csvFileInput");
+            var textInput = document.getElementById("textInput");
+            var predictionResult = document.getElementById("predictionResult");
+            var graphContainer = document.getElementById("graphContainer");
+            var predictBtn = document.getElementById("predictBtn");
+            var originalBtnText = predictBtn.innerHTML;
+
+            // Reset UI
+            predictionResult.style.display = "none";
+            predictionResult.className = "";
+            graphContainer.innerHTML = "";
+            document.getElementById("downloadBtn").style.display = "none";
+
+            // Loading State
+            predictBtn.innerHTML = '<div class="loading"></div> Analyzing...';
+            predictBtn.disabled = true;
+
+            if (csvFileInput.files.length > 0) {
+                // Upload CSV file
+                var formData = new FormData();
+                formData.append("file", csvFileInput.files[0]);
+
+                fetch("/predict", {
+                    method: "POST",
+                    body: formData
+                })
+                    .then(response => {
+                        predictBtn.innerHTML = originalBtnText;
+                        predictBtn.disabled = false;
+
+                        if (response.headers.get('X-Graph-Exists') === 'true') {
+                            var graphData = response.headers.get('X-Graph-Data');
+                            displayGraph(graphData);
+                        }
+                        return response.blob();
+                    })
+                    .then(blob => {
+                        var downloadBtn = document.getElementById("downloadBtn");
+                        downloadBtn.style.display = "block";
+                        
+                        // Setup download
+                        window.currentBlob = blob; // Store blob for download function
+                    })
+                    .catch(error => {
+                        console.error("Error:", error);
+                        predictBtn.innerHTML = originalBtnText;
+                        predictBtn.disabled = false;
+                        showError("An error occurred during processing.");
+                    });
+
+            } else if (textInput.value.trim() !== "") {
+                // Predict on single sentence
+                fetch("/predict", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({ "text": textInput.value.trim() })
+                })
+                    .then(response => response.json())
+                    .then(data => {
+                        predictBtn.innerHTML = originalBtnText;
+                        predictBtn.disabled = false;
+                        
+                        if (data.error) {
+                            showError(data.error);
+                        } else {
+                            showResult(data.prediction);
+                        }
+                    })
+                    .catch(error => {
+                        console.error("Error:", error);
+                        predictBtn.innerHTML = originalBtnText;
+                        predictBtn.disabled = false;
+                        showError("An error occurred. Please try again.");
+                    });
+            } else {
+                 predictBtn.innerHTML = originalBtnText;
+                 predictBtn.disabled = false;
+                 showError("Please enter text or upload a CSV file.");
+            }
+        }
+
+        function downloadPredictions() {
+            if (window.currentBlob) {
+                var url = URL.createObjectURL(window.currentBlob);
+                var a = document.createElement("a");
+                a.href = url;
+                a.download = "Predictions.csv";
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+            }
+        }
+
+        function displayGraph(graphData) {
+            var graphUrl = "data:image/png;base64," + graphData;
+            var img = document.createElement('img');
+            img.src = graphUrl;
+            graphContainer.appendChild(img);
+        }
+
+        function showResult(prediction) {
+            var resultDiv = document.getElementById("predictionResult");
+            resultDiv.style.display = "block";
+            resultDiv.innerHTML = "Prediction: " + prediction;
+            
+            if (prediction.toLowerCase() === "positive") {
+                resultDiv.className = "positive";
+                resultDiv.innerHTML = '<i class="fas fa-smile"></i> ' + resultDiv.innerHTML;
+            } else {
+                resultDiv.className = "negative";
+                resultDiv.innerHTML = '<i class="fas fa-frown"></i> ' + resultDiv.innerHTML;
+            }
+        }
+
+        function showError(message) {
+            var resultDiv = document.getElementById("predictionResult");
+            resultDiv.style.display = "block";
+            resultDiv.className = "negative";
+            resultDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> ' + message;
+        }
+    </script>
+</body>
+</html>
